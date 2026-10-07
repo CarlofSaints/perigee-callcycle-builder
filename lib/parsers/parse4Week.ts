@@ -337,7 +337,7 @@ function mergeSameDayPatternWeeks(entries: ParsedEntry[]): ParsedEntry[] {
     const daysKey = [...e.days].sort().join('|');
     // Code-less stores all have storeId '' — key them by name, or two
     // different code-less stores on the same day collapse into one.
-    const storeKey = e.storeId ? e.storeId.toUpperCase() : `name:${e.storeName.toLowerCase().replace(/s+/g, " ").trim()}`;
+    const storeKey = e.storeId ? e.storeId.toUpperCase() : `name:${e.storeName.toLowerCase().replace(/\s+/g, " ").trim()}`;
     const key = `${e.userEmail.toLowerCase()}__${storeKey}__${daysKey}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(e);

@@ -47,7 +47,7 @@ export async function loadSchedule(tenantSlug: string): Promise<ScheduleRow[]> {
 }
 
 /** Case- and spacing-insensitive store name, for matching code-less rows. */
-const normName = (n: string) => n.toLowerCase().replace(/s+/g, " ").trim();
+const normName = (n: string) => n.toLowerCase().replace(/\s+/g, " ").trim();
 
 export async function mergeIntoSchedule(
   tenantSlug: string,
