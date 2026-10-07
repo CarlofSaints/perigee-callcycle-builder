@@ -19,6 +19,20 @@ export function findDayColumns(row: (string | number | null)[]): { col: number; 
   return cols;
 }
 
+/**
+ * Read a week number from a col-A label: "WEEK 1", "Week: 2", "Week3".
+ * Loose (default) finds the label anywhere in the cell; strict needs the
+ * cell to be ONLY the label, so a banner like "WEEK: 1,2" returns null.
+ * Returns the raw number — callers range-check it.
+ */
+export function parseWeekLabel(text: string, opts?: { strict?: boolean }): number | null {
+  const t = text.trim();
+  const m = opts?.strict
+    ? t.match(/^week\s*[:\s]*\s*(\d+)$/i)
+    : t.match(/week\s*[:\s]*\s*(\d+)/i);
+  return m ? Number(m[1]) : null;
+}
+
 /** Scan first N rows to find the day-header row */
 export function findDayHeaderRow(
   data: (string | number | null)[][],
@@ -143,6 +157,8 @@ export function isStoreCell(value: string): boolean {
   if (!v || v === 'off' || v === '-' || v === 'n/a') return false;
   // Skip cells that look like notes/headers/non-store labels
   if (v.startsWith('week ') || v.startsWith('week:') || v.startsWith('first ')) return false;
+  if (/^week\d+$/.test(v)) return false; // "Week2" block label (Bosch format)
+  if (v === 'admin' || v === 'admin day' || v.endsWith(' meeting')) return false;
   if (v.startsWith('email:') || v.startsWith('email ')) return false;
   if (v === 'training' || v.startsWith('travelling') || v.startsWith('travel ')) return false;
   if (v === 'trade visit' || v.startsWith('trade visit')) return false;
