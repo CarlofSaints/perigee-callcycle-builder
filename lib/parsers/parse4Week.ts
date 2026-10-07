@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { ParsedEntry, ReferenceData } from '../types';
 import {
-  findDayHeaderRow, findDayColumns, extractStoreCode, isStoreCell, addOrMergeEntry,
+  findDayHeaderRow, extractStoreCode, isStoreCell, addOrMergeEntry,
 } from './parserUtils';
 
 /**
@@ -226,7 +226,12 @@ export function parse4Week(
       if (currentWeek === null) continue;
 
       // Bosch format repeats the Mon | Tue | ... header under every week label.
-      if (findDayColumns(row).length >= 3) continue;
+      // Whole-cell match only: findDayColumns() is a prefix match, so a row of
+      // stores like "MONTANA…", "THUNDERTOOL…", "SATURN…" would be dropped.
+      const pureDayCells = row.filter(c =>
+        /^(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(day|sday|nesday|rsday|urday)?\.?$/i
+          .test(String(c ?? '').trim())).length;
+      if (pureDayCells >= 3) continue;
 
       const cycleLabel = `Week ${currentWeek}`;
 
