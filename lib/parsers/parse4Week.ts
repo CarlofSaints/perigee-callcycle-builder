@@ -8,6 +8,16 @@ import {
 const ADMIN_SITE_CODE = 'AD2102';
 
 /**
+ * "Admin", "Admin Day", "Admin.", "ADMIN/OFFICE", "Admin (office)" — only
+ * these words, so "Admin - PnP Norwood" (a real store missing its code) is
+ * NOT swallowed into the admin site.
+ */
+function isAdminLabel(cell: string): boolean {
+  const words = cell.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  return words[0] === 'admin' && words.every(w => w === 'admin' || w === 'day' || w === 'office');
+}
+
+/**
  * User Sheets 4wk format: one sheet per user, 4 individual week blocks stacked
  * vertically. Sheet name MUST be the user's Perigee email address.
  *
@@ -50,6 +60,7 @@ export function parse4Week(
   // Only map code-less "Admin" calls when THIS tenant's store control has the
   // admin site — the parser is shared by every tenant.
   const adminSite = references.stores.find(s => s.storeCode.trim().toUpperCase() === ADMIN_SITE_CODE);
+  const adminSiteCode = adminSite?.storeCode.trim() ?? '';
 
   // Build name/email lookup from reference data so we can populate
   // firstName + surname on the parsed entries.
@@ -257,24 +268,23 @@ export function parse4Week(
           continue;
         }
 
-        // Bosch "Coastal meeting" etc. — a note, not a visit.
-        if (/\bmeeting$/i.test(cellValue)) continue;
-        if (!isStoreCell(cellValue)) continue;
-
-        let { storeName, storeCode } = extractStoreCode(cellValue);
-        if (!storeName) continue;
-
-        if (adminSite) {
-          if (!storeCode && /^admin\b/i.test(cellValue)) {
-            // Code-less "Admin" / "Admin Day" is the team's admin call — book
-            // it against the tenant's admin site and tell the uploader.
-            storeCode = adminSite.storeCode;
-            adminMapped.push(`${cycleLabel} ${day} ("${cellValue}")`);
-          }
+        let storeName: string;
+        let storeCode: string;
+        if (adminSite && isAdminLabel(cellValue)) {
+          // Code-less "Admin" / "Admin Day" is the team's admin call — book
+          // it against the tenant's admin site and tell the uploader. Checked
+          // before isStoreCell(), which skips a bare "Admin".
+          storeName = adminSite.storeName;
+          storeCode = adminSiteCode;
+          adminMapped.push(`${cycleLabel} ${day} ("${cellValue}")`);
+        } else {
+          if (!isStoreCell(cellValue)) continue;
+          ({ storeName, storeCode } = extractStoreCode(cellValue));
+          if (!storeName) continue;
           // One name per admin site, else "Admin/New  stores - AD2102" and a
           // mapped "Admin" in the same week split into two rows and the
           // schedule merge keeps only one of them's days.
-          if (storeCode.toUpperCase() === ADMIN_SITE_CODE) storeName = adminSite.storeName;
+          if (adminSite && storeCode.toUpperCase() === ADMIN_SITE_CODE) storeName = adminSite.storeName;
         }
 
         addOrMergeEntry(entries, {
@@ -295,7 +305,7 @@ export function parse4Week(
     }
 
     if (adminSite && adminMapped.length > 0) {
-      notices.push(`${sheetEmail}: ${adminMapped.length} "Admin" call(s) with no store code were assigned to ${adminSite.storeName} (${adminSite.storeCode}): ${adminMapped.join(', ')}.`);
+      notices.push(`${sheetEmail}: ${adminMapped.length} "Admin" call(s) with no store code were assigned to ${adminSite.storeName} (${adminSiteCode}): ${adminMapped.join(', ')}.`);
     }
 
     if (!foundAnyWeek) {

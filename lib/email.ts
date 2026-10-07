@@ -157,10 +157,10 @@ export async function sendUploadNotification(
       <span style="color:#fff;font-size:20px;font-weight:bold;">${statusIcon} Upload ${statusLabel}</span>
     </div>
     <table style="background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:14px 16px;width:100%;margin-bottom:16px;border-collapse:collapse;">
-      <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Uploaded by</td><td style="font-size:13px;">${entry.userName} &lt;${entry.userEmail}&gt;</td></tr>
+      <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Uploaded by</td><td style="font-size:13px;">${esc(entry.userName)} &lt;${esc(entry.userEmail)}&gt;</td></tr>
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Date</td><td style="font-size:13px;">${dateStr}</td></tr>
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Time</td><td style="font-size:13px;">${timeStr}</td></tr>
-      <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">File</td><td style="font-size:13px;font-family:monospace;word-break:break-all;">${entry.filename}</td></tr>
+      <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">File</td><td style="font-size:13px;font-family:monospace;word-break:break-all;">${esc(entry.filename)}</td></tr>
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Format Detected</td><td style="font-size:13px;">${entry.format}</td></tr>
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Entries Found</td><td style="font-size:13px;">${entry.entriesFound}</td></tr>
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Rows Added</td><td style="font-size:13px;color:${entry.rowsAdded > 0 ? tenant.primaryColor : '#666'};font-weight:${entry.rowsAdded > 0 ? 'bold' : 'normal'};">${entry.rowsAdded}</td></tr>
