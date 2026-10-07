@@ -46,6 +46,9 @@ export async function loadSchedule(tenantSlug: string): Promise<ScheduleRow[]> {
   return fromBlob ?? [];
 }
 
+/** Case- and spacing-insensitive store name, for matching code-less rows. */
+const normName = (n: string) => n.toLowerCase().replace(/s+/g, " ").trim();
+
 export async function mergeIntoSchedule(
   tenantSlug: string,
   entries: ParsedEntry[],
@@ -108,7 +111,7 @@ export async function mergeIntoSchedule(
       r.storeId.toUpperCase() === entry.storeId.toUpperCase() &&
       // Code-less rows all share storeId '' — match those on name too, or
       // every code-less store for a rep+cycle overwrites the previous one.
-      (entry.storeId || r.storeName.toLowerCase() === entry.storeName.toLowerCase()) &&
+      (entry.storeId || normName(r.storeName) === normName(entry.storeName)) &&
       r.cycle === entry.cycle
     );
 

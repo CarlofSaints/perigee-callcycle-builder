@@ -219,7 +219,7 @@ export default function UploadPage() {
                   )}
                   {result.notices && result.notices.length > 0 && (
                     <div className="mt-2 bg-blue-50 border border-blue-300 rounded-lg p-3">
-                      <p className="text-blue-900 font-medium">We changed {result.notices.length === 1 ? 'one thing' : `${result.notices.length} things`} in this file. Please let the customer know:</p>
+                      <p className="text-blue-900 font-medium">We made changes to this file. Please let the customer know:</p>
                       <ul className="list-disc list-inside text-blue-800 text-xs mt-1">
                         {result.notices.map((n, i) => <li key={i}>{n}</li>)}
                       </ul>

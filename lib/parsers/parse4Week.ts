@@ -305,7 +305,8 @@ export function parse4Week(
     }
 
     if (adminSite && adminMapped.length > 0) {
-      notices.push(`${sheetEmail}: ${adminMapped.length} "Admin" call(s) with no store code were assigned to ${adminSite.storeName} (${adminSiteCode}): ${adminMapped.join(', ')}.`);
+      const uniqueMapped = [...new Set(adminMapped)];
+      notices.push(`${sheetEmail}: ${uniqueMapped.length} "Admin" call(s) with no store code were assigned to ${adminSite.storeName} (${adminSiteCode}): ${uniqueMapped.join(', ')}.`);
     }
 
     if (!foundAnyWeek) {
@@ -336,7 +337,7 @@ function mergeSameDayPatternWeeks(entries: ParsedEntry[]): ParsedEntry[] {
     const daysKey = [...e.days].sort().join('|');
     // Code-less stores all have storeId '' — key them by name, or two
     // different code-less stores on the same day collapse into one.
-    const storeKey = e.storeId ? e.storeId.toUpperCase() : `name:${e.storeName.toLowerCase()}`;
+    const storeKey = e.storeId ? e.storeId.toUpperCase() : `name:${e.storeName.toLowerCase().replace(/s+/g, " ").trim()}`;
     const key = `${e.userEmail.toLowerCase()}__${storeKey}__${daysKey}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(e);

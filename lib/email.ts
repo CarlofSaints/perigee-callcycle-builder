@@ -138,7 +138,7 @@ export async function sendUploadNotification(
   const notices = entry.notices ?? [];
   const noticesHtml = notices.length > 0
     ? `<div style="margin:16px 0;padding:12px 16px;background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:4px;">
-        <p style="margin:0 0 4px;font-weight:bold;color:#1E3A8A;font-size:13px;">Changes made to this file (${notices.length}). Please let the customer know:</p>
+        <p style="margin:0 0 4px;font-weight:bold;color:#1E3A8A;font-size:13px;">Changes made to this file. Please let the customer know:</p>
         <ul style="margin:0;padding:0 0 0 18px;color:#1E3A8A;font-size:12px;">
           ${notices.map(n => `<li style="margin:0 0 4px;">${esc(n)}</li>`).join('')}
         </ul>
