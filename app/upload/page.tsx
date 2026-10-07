@@ -22,6 +22,7 @@ export default function UploadPage() {
     rowsUpdated?: number;
     totalRows?: number;
     warnings?: string[];
+    notices?: string[];
     unmatchedDuplicates?: {
       storeCode: string;
       storeName: string;
@@ -215,6 +216,14 @@ export default function UploadPage() {
                   <p className="text-green-700">Entries found: {result.entriesFound} | Added: {result.rowsAdded} | Updated: {result.rowsUpdated} | Total: {result.totalRows}</p>
                   {!!result.skippedRows && (
                     <p className="text-amber-700">Skipped {result.skippedRows} error-site row(s) — see the list below.</p>
+                  )}
+                  {result.notices && result.notices.length > 0 && (
+                    <div className="mt-2 bg-blue-50 border border-blue-300 rounded-lg p-3">
+                      <p className="text-blue-900 font-medium">We changed {result.notices.length === 1 ? 'one thing' : `${result.notices.length} things`} in this file. Please let the customer know:</p>
+                      <ul className="list-disc list-inside text-blue-800 text-xs mt-1">
+                        {result.notices.map((n, i) => <li key={i}>{n}</li>)}
+                      </ul>
+                    </div>
                   )}
                   {result.warnings && result.warnings.length > 0 && (
                     <div className="mt-2">

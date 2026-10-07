@@ -13,6 +13,8 @@ export interface ParseResult {
   format: FileFormat;
   entries: ParsedEntry[];
   warnings: string[];
+  /** Changes the parser made to the file that the customer should be told about. */
+  notices: string[];
 }
 
 export type ParseMode = 'team-leader' | 'user' | 'user-4wk' | 'auto';
@@ -32,6 +34,7 @@ export function parseCallCycleFile(
 
   let entries: ParsedEntry[] = [];
   let warnings: string[] = [];
+  let notices: string[] = [];
   let format: FileFormat;
 
   // Explicit modes skip detectFormat entirely.
@@ -40,7 +43,7 @@ export function parseCallCycleFile(
     const result = parseMarkerFormat(workbook, references);
     entries = result.entries;
     warnings = result.warnings;
-    return { format, entries, warnings };
+    return { format, entries, warnings, notices };
   }
 
   if (parseMode === 'user') {
@@ -48,7 +51,7 @@ export function parseCallCycleFile(
     const result = parseEmailSheet(workbook, references, teamControl);
     entries = result.entries;
     warnings = result.warnings;
-    return { format, entries, warnings };
+    return { format, entries, warnings, notices };
   }
 
   if (parseMode === 'user-4wk') {
@@ -56,7 +59,8 @@ export function parseCallCycleFile(
     const result = parse4Week(workbook, references, options);
     entries = result.entries;
     warnings = result.warnings;
-    return { format, entries, warnings };
+    notices = result.notices;
+    return { format, entries, warnings, notices };
   }
 
   // parseMode === 'auto' — legacy auto-detect path (backward-compat safety net).
@@ -103,5 +107,5 @@ export function parseCallCycleFile(
       warnings.push('Could not auto-detect file format. Please ensure the file matches one of the expected formats.');
   }
 
-  return { format, entries, warnings };
+  return { format, entries, warnings, notices };
 }

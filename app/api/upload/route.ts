@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const teamControlEntries = teamControlData?.teams;
 
     // Parse the file
-    const { format, entries, warnings } = parseCallCycleFile(
+    const { format, entries, warnings, notices } = parseCallCycleFile(
       buffer, references, teamControlEntries, parseMode,
       { ignoreSheetNames },
     );
@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
         rowsUpdated: result.rowsUpdated,
         totalRows: result.totalRows,
         warnings: allWarnings,
+        notices,
         status: uploadStatus,
       }, tenant);
     } catch (err) {
@@ -144,6 +145,7 @@ export async function POST(req: NextRequest) {
       entriesFound: entries.length,
       ...result,
       warnings: allWarnings,
+      notices,
     });
   } catch (err) {
     console.error('[upload] Error:', err);
