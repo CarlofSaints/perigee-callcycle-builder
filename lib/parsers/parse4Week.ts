@@ -4,6 +4,9 @@ import {
   findDayHeaderRow, findDayColumns, parseWeekLabel, extractStoreCode, isStoreCell, addOrMergeEntry,
 } from './parserUtils';
 
+/** Perigee site the iRam team books admin calls against. */
+const ADMIN_SITE_CODE = 'AD2102';
+
 /**
  * User Sheets 4wk format: one sheet per user, 4 individual week blocks stacked
  * vertically. Sheet name MUST be the user's Perigee email address.
@@ -31,10 +34,6 @@ import {
  *
  * Non-email sheets (e.g. a "REP INFO" tab) are skipped silently-with-warning.
  */
-/** Perigee site the iRam team books admin calls against. */
-const ADMIN_SITE_CODE = 'AD2102';
-const ADMIN_SITE_NAME = 'Admin/New stores';
-
 export interface Parse4WeekOptions {
   ignoreSheetNames?: boolean;
 }
@@ -47,6 +46,10 @@ export function parse4Week(
   const entries: ParsedEntry[] = [];
   const warnings: string[] = [];
   const notices: string[] = [];
+
+  // Only map code-less "Admin" calls when THIS tenant's store control has the
+  // admin site — the parser is shared by every tenant.
+  const adminSite = references.stores.find(s => s.storeCode.trim().toUpperCase() === ADMIN_SITE_CODE);
 
   // Build name/email lookup from reference data so we can populate
   // firstName + surname on the parsed entries.
@@ -200,7 +203,6 @@ export function parse4Week(
     }
 
     const notOnPerigee: string[] = [];
-    const skippedNotes: string[] = [];
     const adminMapped: string[] = [];
 
     for (let rowIdx = dayResult.dayRowIdx + 1; rowIdx < data.length; rowIdx++) {
@@ -255,25 +257,24 @@ export function parse4Week(
           continue;
         }
 
-        // A bare "Admin" / "Admin Day" is the team's admin call — book it
-        // against the Perigee admin site and tell the uploader we did.
-        let storeName: string;
-        let storeCode: string;
-        if (/^admin(\s+day)?$/i.test(cellValue)) {
-          storeName = ADMIN_SITE_NAME;
-          storeCode = ADMIN_SITE_CODE;
-          adminMapped.push(`${cycleLabel} ${day} ("${cellValue}")`);
-        } else if (/\bmeeting$/i.test(cellValue)) {
-          skippedNotes.push(cellValue);
-          continue;
-        } else {
-          if (!isStoreCell(cellValue)) continue;
-          ({ storeName, storeCode } = extractStoreCode(cellValue));
-          if (!storeName) continue;
+        // Bosch "Coastal meeting" etc. — a note, not a visit.
+        if (/\bmeeting$/i.test(cellValue)) continue;
+        if (!isStoreCell(cellValue)) continue;
+
+        let { storeName, storeCode } = extractStoreCode(cellValue);
+        if (!storeName) continue;
+
+        if (adminSite) {
+          if (!storeCode && /^admin\b/i.test(cellValue)) {
+            // Code-less "Admin" / "Admin Day" is the team's admin call — book
+            // it against the tenant's admin site and tell the uploader.
+            storeCode = adminSite.storeCode;
+            adminMapped.push(`${cycleLabel} ${day} ("${cellValue}")`);
+          }
           // One name per admin site, else "Admin/New  stores - AD2102" and a
           // mapped "Admin" in the same week split into two rows and the
           // schedule merge keeps only one of them's days.
-          if (storeCode.toUpperCase() === ADMIN_SITE_CODE) storeName = ADMIN_SITE_NAME;
+          if (storeCode.toUpperCase() === ADMIN_SITE_CODE) storeName = adminSite.storeName;
         }
 
         addOrMergeEntry(entries, {
@@ -293,12 +294,8 @@ export function parse4Week(
       warnings.push(`Sheet "${sheetName}": ${unique.length} store(s) marked "not on Perigee" were skipped — set them up in Perigee to include them: ${unique.join('; ')}`);
     }
 
-    if (skippedNotes.length > 0) {
-      warnings.push(`Sheet "${sheetName}": ${skippedNotes.length} meeting note(s) skipped, not a store visit: ${[...new Set(skippedNotes)].join('; ')}`);
-    }
-
-    if (adminMapped.length > 0) {
-      notices.push(`${sheetEmail}: ${adminMapped.length} "Admin" call(s) with no store code were loaded against ${ADMIN_SITE_NAME} (${ADMIN_SITE_CODE}): ${adminMapped.join(', ')}.`);
+    if (adminSite && adminMapped.length > 0) {
+      notices.push(`${sheetEmail}: ${adminMapped.length} "Admin" call(s) with no store code were assigned to ${adminSite.storeName} (${adminSite.storeCode}): ${adminMapped.join(', ')}.`);
     }
 
     if (!foundAnyWeek) {
@@ -327,7 +324,10 @@ function mergeSameDayPatternWeeks(entries: ParsedEntry[]): ParsedEntry[] {
   const groups = new Map<string, ParsedEntry[]>();
   for (const e of entries) {
     const daysKey = [...e.days].sort().join('|');
-    const key = `${e.userEmail.toLowerCase()}__${e.storeId.toUpperCase()}__${daysKey}`;
+    // Code-less stores all have storeId '' — key them by name, or two
+    // different code-less stores on the same day collapse into one.
+    const storeKey = e.storeId ? e.storeId.toUpperCase() : `name:${e.storeName.toLowerCase()}`;
+    const key = `${e.userEmail.toLowerCase()}__${storeKey}__${daysKey}`;
     const bucket = groups.get(key);
     if (bucket) bucket.push(e);
     else groups.set(key, [e]);

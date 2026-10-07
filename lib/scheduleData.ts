@@ -106,6 +106,9 @@ export async function mergeIntoSchedule(
     const existingIdx = schedule.findIndex(r =>
       r.userEmail.toLowerCase() === entry.userEmail.toLowerCase() &&
       r.storeId.toUpperCase() === entry.storeId.toUpperCase() &&
+      // Code-less rows all share storeId '' — match those on name too, or
+      // every code-less store for a rep+cycle overwrites the previous one.
+      (entry.storeId || r.storeName.toLowerCase() === entry.storeName.toLowerCase()) &&
       r.cycle === entry.cycle
     );
 

@@ -93,6 +93,9 @@ export async function sendPasswordResetEmail(to: string, name: string, password:
   });
 }
 
+/** Cell text from uploaded files goes into these emails — never as live HTML. */
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export async function sendUploadNotification(
   toEmails: string[],
   entry: {
@@ -127,12 +130,11 @@ export async function sendUploadNotification(
     ? `<div style="margin:16px 0;padding:12px 16px;background:#FFFBEB;border-left:4px solid #F59E0B;border-radius:4px;">
         <p style="margin:0 0 8px;font-weight:bold;color:#92400E;font-size:13px;">Warnings (${entry.warnings.length}):</p>
         <ul style="margin:0;padding:0 0 0 18px;color:#78350F;font-size:12px;">
-          ${entry.warnings.map(w => `<li style="margin:0 0 4px;">${w}</li>`).join('')}
+          ${entry.warnings.map(w => `<li style="margin:0 0 4px;">${esc(w)}</li>`).join('')}
         </ul>
       </div>`
     : '';
 
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const notices = entry.notices ?? [];
   const noticesHtml = notices.length > 0
     ? `<div style="margin:16px 0;padding:12px 16px;background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:4px;">
@@ -146,7 +148,7 @@ export async function sendUploadNotification(
   const errorHtml = entry.errorMessage
     ? `<div style="margin:16px 0;padding:12px 16px;background:#FEF2F2;border-left:4px solid #EF4444;border-radius:4px;">
         <p style="margin:0;font-weight:bold;color:#991B1B;font-size:13px;">Error:</p>
-        <p style="margin:4px 0 0;color:#7F1D1D;font-size:12px;">${entry.errorMessage}</p>
+        <p style="margin:4px 0 0;color:#7F1D1D;font-size:12px;">${esc(entry.errorMessage)}</p>
       </div>`
     : '';
 
