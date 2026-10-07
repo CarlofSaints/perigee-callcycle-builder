@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { ParsedEntry, ReferenceData } from '../types';
 import {
-  findDayHeaderRow, extractStoreCode, isStoreCell, addOrMergeEntry,
+  findDayHeaderRow, findDayColumns, parseWeekLabel, extractStoreCode, isStoreCell, addOrMergeEntry,
 } from './parserUtils';
 
 /**
@@ -144,7 +144,7 @@ export function parse4Week(
     // onwards on this format is a "calls" count + channel legend and must be
     // ignored — e.g. a "STORE NAME" header in col I would otherwise register
     // as a misspelled day of the week.
-    const dayColumns = dayResult.dayColumns.filter(c => c.col <= 6);
+    let dayColumns = dayResult.dayColumns.filter(c => c.col <= 6);
     if (dayColumns.length < 3) {
       warnings.push(`Sheet "${sheetName}" has too few day columns (A–G) to parse.`);
       continue;
@@ -158,42 +158,43 @@ export function parse4Week(
     // as the day headers (e.g. Frederic's sheet in the PTA file).
     const headerRow = data[dayResult.dayRowIdx] || [];
     const headerColA = String(headerRow[0] || '').trim();
-    const headerWeekMatch = headerColA.match(/week\s*[:\s]*\s*(\d+)/i);
-    if (headerWeekMatch) {
-      const weekNum = Number(headerWeekMatch[1]);
-      if (weekNum >= 1 && weekNum <= 6) {
-        currentWeek = weekNum;
-        foundAnyWeek = true;
-      }
+    const headerWeek = parseWeekLabel(headerColA);
+    if (headerWeek !== null && headerWeek >= 1 && headerWeek <= 6) {
+      currentWeek = headerWeek;
+      foundAnyWeek = true;
     }
 
-    // Bosch format: a bare "Week1" label sits in col A on its own row ABOVE
-    // the day header. Strict match so MT's "WEEK: 1,2" banner is not taken.
+    // Bosch format: a bare "Week1" label sits in col A on its own row just
+    // ABOVE the day header. Only look 3 rows up (a preamble further up may
+    // list "Week 1".."Week 4" objectives), and strict so MT's "WEEK: 1,2"
+    // banner is not taken.
     if (currentWeek === null) {
-      for (let r = dayResult.dayRowIdx - 1; r >= 0; r--) {
-        const m = String((data[r] || [])[0] || '').trim().match(/^week\s*(\d)$/i);
-        if (m && Number(m[1]) >= 1 && Number(m[1]) <= 6) {
-          currentWeek = Number(m[1]);
+      for (let r = dayResult.dayRowIdx - 1; r >= Math.max(0, dayResult.dayRowIdx - 3); r--) {
+        const w = parseWeekLabel(String((data[r] || [])[0] || ''), { strict: true });
+        if (w !== null && w >= 1 && w <= 6) {
+          currentWeek = w;
           foundAnyWeek = true;
           break;
         }
       }
     }
 
-    // Bosch format (e.g. KZN): the first block has no label at all, and the
-    // next label below is "Week2" — so the unlabelled block is week 1.
+    // Bosch format (e.g. KZN): the first block has no label at all. Infer it
+    // from the next label below: "Week 2" means the unlabelled block is week 1.
     if (currentWeek === null) {
       for (let r = dayResult.dayRowIdx + 1; r < data.length; r++) {
-        const m = String((data[r] || [])[0] || '').trim().match(/^week\s*[:\s]*\s*(\d+)$/i);
-        if (!m) continue;
-        if (Number(m[1]) === 2) {
-          currentWeek = 1;
+        const w = parseWeekLabel(String((data[r] || [])[0] || ''));
+        if (w === null) continue;
+        if (w >= 2 && w <= 6) {
+          currentWeek = w - 1;
           foundAnyWeek = true;
-          warnings.push(`Sheet "${sheetName}": first block has no week label — treated as Week 1.`);
+          warnings.push(`Sheet "${sheetName}": first block has no week label — treated as Week ${w - 1}.`);
         }
         break;
       }
     }
+
+    const notOnPerigee: string[] = [];
 
     for (let rowIdx = dayResult.dayRowIdx + 1; rowIdx < data.length; rowIdx++) {
       const row = data[rowIdx] || [];
@@ -207,9 +208,8 @@ export function parse4Week(
       // in col B). Fall through to the store-cell loop below.
       const colAStr = String(row[0] || '').trim();
       if (colAStr) {
-        const weekMatch = colAStr.match(/week\s*[:\s]*\s*(\d+)/i);
-        if (weekMatch) {
-          const weekNum = Number(weekMatch[1]);
+        const weekNum = parseWeekLabel(colAStr);
+        if (weekNum !== null) {
           if (weekNum < 1 || weekNum > 6) {
             warnings.push(`Sheet "${sheetName}" row ${rowIdx + 1}: unexpected week number "${colAStr}"`);
             currentWeek = null;
@@ -231,12 +231,22 @@ export function parse4Week(
       const pureDayCells = row.filter(c =>
         /^(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(day|sday|nesday|rsday|urday)?\.?$/i
           .test(String(c ?? '').trim())).length;
-      if (pureDayCells >= 3) continue;
+      if (pureDayCells >= 3) {
+        // Re-read the day positions: a later week's header may be laid out
+        // differently, and its stores must not inherit week 1's columns.
+        const cols = findDayColumns(row).filter(c => c.col <= 6);
+        if (cols.length >= 3) dayColumns = cols;
+        continue;
+      }
 
       const cycleLabel = `Week ${currentWeek}`;
 
       for (const { col, day } of dayColumns) {
         const cellValue = String(row[col] || '').trim();
+        if (/not on perige+/i.test(cellValue)) {
+          notOnPerigee.push(cellValue);
+          continue;
+        }
         if (!isStoreCell(cellValue)) continue;
 
         const { storeName, storeCode } = extractStoreCode(cellValue);
@@ -252,6 +262,11 @@ export function parse4Week(
           day,
         });
       }
+    }
+
+    if (notOnPerigee.length > 0) {
+      const unique = [...new Set(notOnPerigee)];
+      warnings.push(`Sheet "${sheetName}": ${unique.length} store(s) marked "not on Perigee" were skipped — set them up in Perigee to include them: ${unique.join('; ')}`);
     }
 
     if (!foundAnyWeek) {
