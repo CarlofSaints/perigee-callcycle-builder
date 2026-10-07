@@ -31,6 +31,10 @@ import {
  *
  * Non-email sheets (e.g. a "REP INFO" tab) are skipped silently-with-warning.
  */
+/** Perigee site the iRam team books admin calls against. */
+const ADMIN_SITE_CODE = 'AD2102';
+const ADMIN_SITE_NAME = 'Admin/New stores';
+
 export interface Parse4WeekOptions {
   ignoreSheetNames?: boolean;
 }
@@ -39,9 +43,10 @@ export function parse4Week(
   workbook: XLSX.WorkBook,
   references: ReferenceData,
   options?: Parse4WeekOptions,
-): { entries: ParsedEntry[]; warnings: string[] } {
+): { entries: ParsedEntry[]; warnings: string[]; notices: string[] } {
   const entries: ParsedEntry[] = [];
   const warnings: string[] = [];
+  const notices: string[] = [];
 
   // Build name/email lookup from reference data so we can populate
   // firstName + surname on the parsed entries.
@@ -195,6 +200,8 @@ export function parse4Week(
     }
 
     const notOnPerigee: string[] = [];
+    const skippedNotes: string[] = [];
+    const adminMapped: string[] = [];
 
     for (let rowIdx = dayResult.dayRowIdx + 1; rowIdx < data.length; rowIdx++) {
       const row = data[rowIdx] || [];
@@ -247,10 +254,27 @@ export function parse4Week(
           notOnPerigee.push(cellValue);
           continue;
         }
-        if (!isStoreCell(cellValue)) continue;
 
-        const { storeName, storeCode } = extractStoreCode(cellValue);
-        if (!storeName) continue;
+        // A bare "Admin" / "Admin Day" is the team's admin call — book it
+        // against the Perigee admin site and tell the uploader we did.
+        let storeName: string;
+        let storeCode: string;
+        if (/^admin(\s+day)?$/i.test(cellValue)) {
+          storeName = ADMIN_SITE_NAME;
+          storeCode = ADMIN_SITE_CODE;
+          adminMapped.push(`${cycleLabel} ${day} ("${cellValue}")`);
+        } else if (/\bmeeting$/i.test(cellValue)) {
+          skippedNotes.push(cellValue);
+          continue;
+        } else {
+          if (!isStoreCell(cellValue)) continue;
+          ({ storeName, storeCode } = extractStoreCode(cellValue));
+          if (!storeName) continue;
+          // One name per admin site, else "Admin/New  stores - AD2102" and a
+          // mapped "Admin" in the same week split into two rows and the
+          // schedule merge keeps only one of them's days.
+          if (storeCode.toUpperCase() === ADMIN_SITE_CODE) storeName = ADMIN_SITE_NAME;
+        }
 
         addOrMergeEntry(entries, {
           userEmail: sheetEmail,
@@ -269,12 +293,20 @@ export function parse4Week(
       warnings.push(`Sheet "${sheetName}": ${unique.length} store(s) marked "not on Perigee" were skipped — set them up in Perigee to include them: ${unique.join('; ')}`);
     }
 
+    if (skippedNotes.length > 0) {
+      warnings.push(`Sheet "${sheetName}": ${skippedNotes.length} meeting note(s) skipped, not a store visit: ${[...new Set(skippedNotes)].join('; ')}`);
+    }
+
+    if (adminMapped.length > 0) {
+      notices.push(`${sheetEmail}: ${adminMapped.length} "Admin" call(s) with no store code were loaded against ${ADMIN_SITE_NAME} (${ADMIN_SITE_CODE}): ${adminMapped.join(', ')}.`);
+    }
+
     if (!foundAnyWeek) {
       warnings.push(`Sheet "${sheetName}" has no "WEEK N" markers in column A — no entries parsed.`);
     }
   }
 
-  return { entries: mergeSameDayPatternWeeks(entries), warnings };
+  return { entries: mergeSameDayPatternWeeks(entries), warnings, notices };
 }
 
 /**

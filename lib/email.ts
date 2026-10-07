@@ -106,6 +106,8 @@ export async function sendUploadNotification(
     rowsUpdated: number;
     totalRows: number;
     warnings: string[];
+    /** Changes we made to the file that the customer should be told about. */
+    notices?: string[];
     status: 'success' | 'partial' | 'failed';
     errorMessage?: string;
   },
@@ -126,6 +128,17 @@ export async function sendUploadNotification(
         <p style="margin:0 0 8px;font-weight:bold;color:#92400E;font-size:13px;">Warnings (${entry.warnings.length}):</p>
         <ul style="margin:0;padding:0 0 0 18px;color:#78350F;font-size:12px;">
           ${entry.warnings.map(w => `<li style="margin:0 0 4px;">${w}</li>`).join('')}
+        </ul>
+      </div>`
+    : '';
+
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const notices = entry.notices ?? [];
+  const noticesHtml = notices.length > 0
+    ? `<div style="margin:16px 0;padding:12px 16px;background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:4px;">
+        <p style="margin:0 0 4px;font-weight:bold;color:#1E3A8A;font-size:13px;">Changes made to this file (${notices.length}). Please let the customer know:</p>
+        <ul style="margin:0;padding:0 0 0 18px;color:#1E3A8A;font-size:12px;">
+          ${notices.map(n => `<li style="margin:0 0 4px;">${esc(n)}</li>`).join('')}
         </ul>
       </div>`
     : '';
@@ -152,6 +165,7 @@ export async function sendUploadNotification(
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Rows Updated</td><td style="font-size:13px;color:${entry.rowsUpdated > 0 ? '#F59E0B' : '#666'};font-weight:${entry.rowsUpdated > 0 ? 'bold' : 'normal'};">${entry.rowsUpdated}</td></tr>
       <tr><td style="padding:5px 12px 5px 0;color:#666;font-size:13px;white-space:nowrap;">Total Schedule Rows</td><td style="font-size:13px;font-weight:bold;">${entry.totalRows}</td></tr>
     </table>
+    ${noticesHtml}
     ${warningsHtml}
     ${errorHtml}
     <p style="margin:0;color:#999;font-size:12px;">This is an automated notification from ${tenant.name} ${tenant.subtitle}.</p>
