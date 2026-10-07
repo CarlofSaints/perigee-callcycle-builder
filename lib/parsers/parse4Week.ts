@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { ParsedEntry, ReferenceData } from '../types';
 import {
-  findDayHeaderRow, extractStoreCode, isStoreCell, addOrMergeEntry,
+  findDayHeaderRow, findDayColumns, extractStoreCode, isStoreCell, addOrMergeEntry,
 } from './parserUtils';
 
 /**
@@ -167,6 +167,34 @@ export function parse4Week(
       }
     }
 
+    // Bosch format: a bare "Week1" label sits in col A on its own row ABOVE
+    // the day header. Strict match so MT's "WEEK: 1,2" banner is not taken.
+    if (currentWeek === null) {
+      for (let r = dayResult.dayRowIdx - 1; r >= 0; r--) {
+        const m = String((data[r] || [])[0] || '').trim().match(/^week\s*(\d)$/i);
+        if (m && Number(m[1]) >= 1 && Number(m[1]) <= 6) {
+          currentWeek = Number(m[1]);
+          foundAnyWeek = true;
+          break;
+        }
+      }
+    }
+
+    // Bosch format (e.g. KZN): the first block has no label at all, and the
+    // next label below is "Week2" — so the unlabelled block is week 1.
+    if (currentWeek === null) {
+      for (let r = dayResult.dayRowIdx + 1; r < data.length; r++) {
+        const m = String((data[r] || [])[0] || '').trim().match(/^week\s*[:\s]*\s*(\d+)$/i);
+        if (!m) continue;
+        if (Number(m[1]) === 2) {
+          currentWeek = 1;
+          foundAnyWeek = true;
+          warnings.push(`Sheet "${sheetName}": first block has no week label — treated as Week 1.`);
+        }
+        break;
+      }
+    }
+
     for (let rowIdx = dayResult.dayRowIdx + 1; rowIdx < data.length; rowIdx++) {
       const row = data[rowIdx] || [];
 
@@ -196,6 +224,9 @@ export function parse4Week(
       // Skip rows until we've seen at least one WEEK marker — prevents us
       // picking up stray store cells from garbage rows above the first block.
       if (currentWeek === null) continue;
+
+      // Bosch format repeats the Mon | Tue | ... header under every week label.
+      if (findDayColumns(row).length >= 3) continue;
 
       const cycleLabel = `Week ${currentWeek}`;
 

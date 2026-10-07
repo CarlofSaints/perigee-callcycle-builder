@@ -143,6 +143,10 @@ export function isStoreCell(value: string): boolean {
   if (!v || v === 'off' || v === '-' || v === 'n/a') return false;
   // Skip cells that look like notes/headers/non-store labels
   if (v.startsWith('week ') || v.startsWith('week:') || v.startsWith('first ')) return false;
+  if (/^week\d+$/.test(v)) return false; // "Week2" block label (Bosch format)
+  // Author flagged the store as not set up in Perigee — it can never load
+  if (/not on perige+/.test(v)) return false;
+  if (v === 'admin' || v === 'admin day' || v.endsWith(' meeting')) return false;
   if (v.startsWith('email:') || v.startsWith('email ')) return false;
   if (v === 'training' || v.startsWith('travelling') || v.startsWith('travel ')) return false;
   if (v === 'trade visit' || v.startsWith('trade visit')) return false;
